@@ -1,6 +1,12 @@
 import Phaser from "phaser";
 import "./style.css";
-import { GameScene, HudState, AbilityName, OverlayState } from "./game/GameScene";
+import {
+  GameScene,
+  HudState,
+  AbilityName,
+  OverlayState,
+  ControlMode
+} from "./game/GameScene";
 
 type InputState = {
   up: boolean;
@@ -24,6 +30,7 @@ const trashButton = document.querySelector<HTMLButtonElement>("#trashAbility");
 const fochButton = document.querySelector<HTMLButtonElement>("#fochAbility");
 const trashCooldown = document.querySelector<HTMLDivElement>("#trashCooldown");
 const fochCooldown = document.querySelector<HTMLDivElement>("#fochCooldown");
+const touchControls = document.querySelector<HTMLDivElement>("#touchControls");
 const touchButtons = document.querySelectorAll<HTMLButtonElement>(".touch-button");
 const startOverlay = document.querySelector<HTMLDivElement>("#startOverlay");
 const startAvatar = document.querySelector<HTMLImageElement>("#startAvatar");
@@ -34,6 +41,10 @@ const eventEyebrow = document.querySelector<HTMLDivElement>("#eventEyebrow");
 const eventTitle = document.querySelector<HTMLHeadingElement>("#eventTitle");
 const eventQuote = document.querySelector<HTMLParagraphElement>("#eventQuote");
 const eventButton = document.querySelector<HTMLButtonElement>("#eventButton");
+const controlModeToggle =
+  document.querySelector<HTMLInputElement>("#controlModeToggle");
+const controlModeLabel =
+  document.querySelector<HTMLSpanElement>("#controlModeLabel");
 const avatarVariantToggle =
   document.querySelector<HTMLInputElement>("#avatarVariantToggle");
 const avatarVariantLabel =
@@ -50,6 +61,7 @@ if (
   !fochButton ||
   !trashCooldown ||
   !fochCooldown ||
+  !touchControls ||
   !startOverlay ||
   !startAvatar ||
   !startButton ||
@@ -59,6 +71,8 @@ if (
   !eventTitle ||
   !eventQuote ||
   !eventButton ||
+  !controlModeToggle ||
+  !controlModeLabel ||
   !avatarVariantToggle ||
   !avatarVariantLabel ||
   !musicToggle ||
@@ -72,11 +86,33 @@ const assetBase = `${import.meta.env.BASE_URL}assets/`;
 startAvatar.src = `${assetBase}luiza.png`;
 startAvatar.alt = "Luiza";
 
+const repairMojibake = (value: string): string => {
+  let repaired = value;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!/[ÃÄÅĆÐÑÓÕØâ]/.test(repaired)) {
+      break;
+    }
+
+    try {
+      const next = decodeURIComponent(escape(repaired));
+      if (!next || next === repaired) {
+        break;
+      }
+      repaired = next;
+    } catch {
+      break;
+    }
+  }
+
+  return repaired;
+};
+
 const updateHud = (state: HudState): void => {
   scoreValue.textContent = `${state.score}`;
   timeValue.textContent = `${state.timeLeft}`;
   levelValue.textContent = `${state.levelIndex} / ${state.levelCount}`;
-  messageValue.textContent = state.message;
+  messageValue.textContent = repairMojibake(state.message);
 
   trashButton.disabled = !state.trashOutReady;
   fochButton.disabled = !state.fochReady;
@@ -95,10 +131,10 @@ const updateOverlay = (state: OverlayState): void => {
   }
 
   eventOverlay.classList.remove("hidden");
-  eventEyebrow.textContent = state.eyebrow;
-  eventTitle.textContent = state.title;
-  eventQuote.textContent = state.quote;
-  eventButton.textContent = state.buttonLabel;
+  eventEyebrow.textContent = repairMojibake(state.eyebrow);
+  eventTitle.textContent = repairMojibake(state.title);
+  eventQuote.textContent = repairMojibake(state.quote);
+  eventButton.textContent = repairMojibake(state.buttonLabel);
   eventAvatar.src =
     state.avatar === "arek" ? `${assetBase}arek.jpg` : `${assetBase}luiza.png`;
   eventAvatar.alt = state.avatar === "arek" ? "Arek" : "Luiza";
@@ -145,12 +181,28 @@ const updateMusicUi = (): void => {
   sceneRef?.setAudioEnabled(musicToggle.checked);
 };
 
+const resetDirectionalInput = (): void => {
+  inputState.up = false;
+  inputState.down = false;
+  inputState.left = false;
+  inputState.right = false;
+};
+
+const updateControlModeUi = (): void => {
+  const mode: ControlMode = controlModeToggle.checked ? "mouse" : "classic";
+  controlModeLabel.textContent = mode === "mouse" ? "Myszka" : "Klasyczne";
+  touchControls.classList.toggle("hidden", mode === "mouse");
+  resetDirectionalInput();
+  sceneRef?.setControlMode(mode);
+};
+
 trashButton.addEventListener("click", () => activateAbility("trashOut"));
 fochButton.addEventListener("click", () => activateAbility("foch"));
 startButton.addEventListener("click", startGame);
 eventButton.addEventListener("click", continueOverlay);
 avatarVariantToggle.addEventListener("change", updateAvatarVariantUi);
 musicToggle.addEventListener("change", updateMusicUi);
+controlModeToggle.addEventListener("change", updateControlModeUi);
 startOverlay.addEventListener("click", (event) => {
   if (event.target === startOverlay) {
     startGame();
@@ -158,11 +210,7 @@ startOverlay.addEventListener("click", (event) => {
 });
 updateAvatarVariantUi();
 updateMusicUi();
-eventOverlay.addEventListener("click", (event) => {
-  if (event.target === eventOverlay) {
-    continueOverlay();
-  }
-});
+updateControlModeUi();
 
 const setDirection = (dir: keyof InputState, active: boolean): void => {
   inputState[dir] = active;
@@ -195,10 +243,7 @@ touchButtons.forEach((button) => {
 });
 
 window.addEventListener("blur", () => {
-  inputState.up = false;
-  inputState.down = false;
-  inputState.left = false;
-  inputState.right = false;
+  resetDirectionalInput();
 });
 
 window.addEventListener("keydown", (event) => {

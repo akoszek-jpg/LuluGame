@@ -369,6 +369,10 @@ body {
   pointer-events: none;
 }
 
+.touch-controls.hidden {
+  display: none !important;
+}
+
 .touch-button {
   pointer-events: auto;
   border: none;

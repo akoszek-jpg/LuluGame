@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { LEVELS, LevelData, FurnitureData, RoomData } from "./levelData";
 
 export type AbilityName = "trashOut" | "foch";
+export type ControlMode = "classic" | "mouse";
 
 export type HudState = {
   score: number;
@@ -82,15 +83,26 @@ type CharacterView = {
   label: Phaser.GameObjects.Text;
 };
 
+type DirtStyle = {
+  textureKey: string;
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  angle: number;
+};
+
 const LEVEL_TIME = 60;
 const CLEAN_DURATION = 1000;
 const AREK_DIRTY_DURATION = 2250;
 const PLAYER_SPEED = 250;
+const TOTAL_DIFFICULTY_LEVELS = 10;
+const DIFFICULTY_SPEED_STEP = 0.1;
 const CLEAN_RANGE = 74;
+const POINTER_REACHED_THRESHOLD = 10;
 const ABILITY_COOLDOWN = 30;
 const ABILITY_DURATION = 3;
 const BONUS_ALL_CLEAN = 100;
-const CLEAN_VOICE_LINES = ["Nareszcie czysto!"];
+const CLEAN_VOICE_LINES = ["Czysto!","Super!"];
 const CLEAN_VOICE_CONFIG = {
   rate: 0.95,
   pitch: 2.0,
@@ -133,6 +145,12 @@ const TIMEOUT_QUOTES = [
   "Posprzątane, a Arek już kombinuje, gdzie tu zrobić nowy bałagan!",
   "Porządek gotowy, tylko patrzeć jak Arek znów coś napsoci!"
 ];
+const TIMEOUT_RESTART_QUOTES = [
+  "AREK rozsiadĹ‚ siÄ™ na kanapie i ogĹ‚asza: misja sprzÄ…tanie zakoĹ„czona spektakularnym baĹ‚aganem.",
+  "Luiza byĹ‚a blisko, ale AREK twierdzi, ĹĽe ten chaos to teraz nowy styl wnÄ™trzarski.",
+  "TykaĹ‚ zegar, a AREK juĹĽ szykowaĹ‚ zwyciÄ™ski taniec brudnych skarpetek.",
+  "AREK melduje, ĹĽe poziom obroniĹ‚ siÄ™ przed porzÄ…dkiem i zostaje z nami na bis."
+];
 const MUSIC_NOTES = [659.25, 783.99, 880.0, 783.99, 987.77, 880.0, 783.99, 659.25];
 
 export class GameScene extends Phaser.Scene {
@@ -141,6 +159,7 @@ export class GameScene extends Phaser.Scene {
   private readonly inputState: InputState;
 
   private levelIndex = 0;
+  private controlMode: ControlMode = "classic";
   private currentLevel!: LevelData;
   private score = 0;
   private timeLeft = LEVEL_TIME;
@@ -155,6 +174,7 @@ export class GameScene extends Phaser.Scene {
   private playerView?: CharacterView;
   private arekView?: CharacterView;
   private playerPosition = new Phaser.Math.Vector2();
+  private playerTarget?: Phaser.Math.Vector2;
   private arekPosition = new Phaser.Math.Vector2();
   private arekTarget = new Phaser.Math.Vector2();
 
@@ -216,6 +236,7 @@ export class GameScene extends Phaser.Scene {
       string,
       Phaser.Input.Keyboard.Key
     >;
+    this.input.on("pointerdown", this.handlePointerDown, this);
 
     this.cameras.main.setBackgroundColor(0xf7eee2);
     try {
@@ -257,7 +278,7 @@ export class GameScene extends Phaser.Scene {
 
     this.timeLeft = Math.max(0, this.timeLeft - delta);
     if (this.timeLeft === 0) {
-      this.handleLevelTimeout();
+      this.handleLevelFailure();
       return;
     }
 
@@ -300,7 +321,7 @@ export class GameScene extends Phaser.Scene {
 
   private loadLevel(index: number, resetScore: boolean): void {
     this.levelIndex = index;
-    this.currentLevel = LEVELS[index];
+    this.currentLevel = LEVELS[index % LEVELS.length];
     this.timeLeft = LEVEL_TIME;
     this.message =
       index === 0 && !this.gameStarted
@@ -337,6 +358,7 @@ export class GameScene extends Phaser.Scene {
       this.currentLevel.arekSpawn.y
     );
     this.arekTarget.set(this.arekPosition.x, this.arekPosition.y);
+    this.playerTarget = undefined;
 
     this.roomLayer?.destroy();
     this.roomTexts.forEach((text) => text.destroy());
@@ -386,6 +408,16 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.clearAudioQueue();
     }
+  }
+
+  setControlMode(mode: ControlMode): void {
+    this.controlMode = mode;
+    if (mode === "classic") {
+      this.playerTarget = undefined;
+      return;
+    }
+
+    this.clearDirectionalInput();
   }
 
   continueAfterOverlay(): void {
@@ -449,8 +481,9 @@ export class GameScene extends Phaser.Scene {
 
     this.roomLayer = graphics;
 
-    this.currentLevel.furniture.forEach((item) => {
+    this.currentLevel.furniture.forEach((item, index) => {
       const spriteKey = this.resolveFurnitureSprite(item.id);
+      const dirtStyle = this.resolveDirtStyle(item.id, index);
       const shadow = this.add.ellipse(
         item.x,
         item.y + item.height * 0.22,
@@ -472,11 +505,14 @@ export class GameScene extends Phaser.Scene {
       image.setTint(0xa97767);
 
       const dirt = this.add.image(
-        item.x + item.width * 0.18,
-        item.y + item.height * 0.14,
-        "fx-dirt"
+        item.x + item.width * dirtStyle.offsetX,
+        item.y + item.height * dirtStyle.offsetY,
+        dirtStyle.textureKey
       );
-      dirt.setScale(Math.max(0.55, Math.min(item.width, item.height) / 68));
+      dirt.setScale(
+        Math.max(0.36, Math.min(item.width, item.height) / 124) * dirtStyle.scale
+      );
+      dirt.setAngle(dirtStyle.angle);
       dirt.setAlpha(0.98);
 
       const sparkle = this.add.image(
@@ -561,11 +597,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const move = this.readMovementInput();
+    const move = this.readPlayerMoveIntent();
     if (move.lengthSq() > 0) {
-      move.normalize();
-      this.playerPosition.x += move.x * PLAYER_SPEED * delta;
-      this.playerPosition.y += move.y * PLAYER_SPEED * delta;
+      const speed = this.getPlayerMoveSpeed();
+      this.playerPosition.x += move.x * speed * delta;
+      this.playerPosition.y += move.y * speed * delta;
       this.clampPosition(this.playerPosition, 30);
     }
 
@@ -575,6 +611,32 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateCharacterViews();
+  }
+
+  private readPlayerMoveIntent(): Phaser.Math.Vector2 {
+    if (this.controlMode === "mouse") {
+      return this.readPointerMovement();
+    }
+
+    return this.readMovementInput();
+  }
+
+  private readPointerMovement(): Phaser.Math.Vector2 {
+    if (!this.playerTarget) {
+      return new Phaser.Math.Vector2(0, 0);
+    }
+
+    const move = new Phaser.Math.Vector2(
+      this.playerTarget.x - this.playerPosition.x,
+      this.playerTarget.y - this.playerPosition.y
+    );
+    if (move.lengthSq() <= POINTER_REACHED_THRESHOLD * POINTER_REACHED_THRESHOLD) {
+      this.playerPosition.copy(this.playerTarget);
+      this.playerTarget = undefined;
+      return new Phaser.Math.Vector2(0, 0);
+    }
+
+    return move.normalize();
   }
 
   private readMovementInput(): Phaser.Math.Vector2 {
@@ -594,6 +656,28 @@ export class GameScene extends Phaser.Scene {
     }
 
     return move;
+  }
+
+  private handlePointerDown(pointer: Phaser.Input.Pointer): void {
+    if (
+      this.controlMode !== "mouse" ||
+      !this.gameStarted ||
+      this.gameEnded ||
+      this.overlayVisible ||
+      this.nextLevelTimer > 0
+    ) {
+      return;
+    }
+
+    this.playerTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+    this.clampPosition(this.playerTarget, 30);
+  }
+
+  private clearDirectionalInput(): void {
+    this.inputState.up = false;
+    this.inputState.down = false;
+    this.inputState.left = false;
+    this.inputState.right = false;
   }
 
   private updateArek(delta: number): void {
@@ -847,13 +931,21 @@ export class GameScene extends Phaser.Scene {
 
   private getArekMoveSpeed(): number {
     const cleanCount = this.furnitureStates.filter((item) => item.state === "clean").length;
-    const levelBonus = [1, 1.08, 1.18][this.levelIndex] ?? 1.2;
+    const levelBonus = this.getDifficultySpeedMultiplier();
     const pressureBonus = cleanCount >= 4 ? 1.08 : 1;
     return this.currentLevel.arekSpeed * levelBonus * pressureBonus;
   }
 
+  private getPlayerMoveSpeed(): number {
+    return PLAYER_SPEED * this.getDifficultySpeedMultiplier();
+  }
+
+  private getDifficultySpeedMultiplier(): number {
+    return 1 + this.levelIndex * DIFFICULTY_SPEED_STEP;
+  }
+
   private getArekDirtyDuration(): number {
-    const multiplier = [1, 0.86, 0.72][this.levelIndex] ?? 0.68;
+    const multiplier = Math.max(0.35, 1 - this.levelIndex * 0.1);
     return AREK_DIRTY_DURATION * multiplier;
   }
 
@@ -955,7 +1047,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.fullCleanPending = false;
-    if (this.levelIndex >= LEVELS.length - 1) {
+    if (this.levelIndex >= TOTAL_DIFFICULTY_LEVELS - 1) {
       this.finishGame(true);
       return;
     }
@@ -1004,7 +1096,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleLevelTimeout(): void {
-    if (this.levelIndex >= LEVELS.length - 1) {
+    if (this.levelIndex >= TOTAL_DIFFICULTY_LEVELS - 1) {
       this.finishGame(false);
       return;
     }
@@ -1022,12 +1114,30 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private handleLevelFailure(): void {
+    this.gameEnded = true;
+    this.clearAudioQueue();
+    this.pendingRestart = true;
+    this.pendingLevelIndex = null;
+    this.overlayVisible = true;
+    this.message = `AREK wygrał rundę bałaganu. Wracacie na poziom 1 z wynikiem ${this.score}.`;
+    this.overlayUpdater({
+      visible: true,
+      eyebrow: "AREK MA UBaw",
+      title: "Oops, bałagan wygrywa!",
+      quote: Phaser.Utils.Array.GetRandom(TIMEOUT_RESTART_QUOTES),
+      buttonLabel: "Wróć na poziom 1",
+      avatar: "arek"
+    });
+    this.syncHud();
+  }
+
   private syncHud(): void {
     this.hudUpdater({
       score: this.score,
       timeLeft: Math.ceil(this.timeLeft),
       levelIndex: this.levelIndex + 1,
-      levelCount: LEVELS.length,
+      levelCount: TOTAL_DIFFICULTY_LEVELS,
       trashOutReady:
         this.gameStarted &&
         !this.gameEnded &&
@@ -1541,6 +1651,18 @@ export class GameScene extends Phaser.Scene {
     return "table";
   }
 
+  private resolveDirtStyle(id: string, index: number): DirtStyle {
+    const variants: DirtStyle[] = [
+      { textureKey: "fx-dirt-streak", offsetX: 0.08, offsetY: -0.02, scale: 1.18, angle: -18 },
+      { textureKey: "fx-dirt-crumbs", offsetX: 0.24, offsetY: 0.18, scale: 1.05, angle: 6 },
+      { textureKey: "fx-dirt-smudge", offsetX: -0.12, offsetY: 0.08, scale: 1.2, angle: 14 },
+      { textureKey: "fx-dirt", offsetX: 0.2, offsetY: 0.12, scale: 1.1, angle: -8 }
+    ];
+
+    const hash = [...id].reduce((sum, char) => sum + char.charCodeAt(0), index);
+    return variants[hash % variants.length];
+  }
+
   private createProceduralTextures(): void {
     if (this.textures.exists("character-luiza")) {
       return;
@@ -1560,6 +1682,42 @@ export class GameScene extends Phaser.Scene {
       graphics.fillCircle(24, 26, 11);
       graphics.fillCircle(34, 18, 7);
       graphics.fillCircle(18, 32, 7);
+    });
+
+    generate("fx-dirt-streak", 72, 56, () => {
+      graphics.fillStyle(0x69352b, 0.94);
+      graphics.fillRoundedRect(8, 12, 50, 10, 6);
+      graphics.fillRoundedRect(16, 24, 42, 9, 5);
+      graphics.fillRoundedRect(24, 35, 32, 8, 4);
+      graphics.fillCircle(58, 15, 6);
+      graphics.fillCircle(18, 39, 5);
+      graphics.lineStyle(5, 0x311612, 0.26);
+      graphics.strokeLineShape(new Phaser.Geom.Line(12, 18, 62, 6));
+      graphics.strokeLineShape(new Phaser.Geom.Line(22, 31, 67, 20));
+    });
+
+    generate("fx-dirt-crumbs", 70, 62, () => {
+      graphics.fillStyle(0x5b2f25, 0.98);
+      const crumbs = [
+        [12, 18, 5], [24, 14, 4], [38, 20, 6], [50, 16, 5], [18, 32, 4], [30, 30, 5],
+        [45, 34, 4], [58, 29, 6], [14, 46, 5], [28, 48, 4], [42, 46, 5], [55, 44, 4]
+      ];
+      crumbs.forEach(([x, y, r]) => graphics.fillCircle(x, y, r));
+      graphics.fillStyle(0x3e2019, 0.5);
+      graphics.fillCircle(34, 33, 12);
+    });
+
+    generate("fx-dirt-smudge", 74, 62, () => {
+      graphics.fillStyle(0x4f2b24, 0.96);
+      graphics.fillEllipse(26, 28, 30, 18);
+      graphics.fillEllipse(45, 23, 26, 16);
+      graphics.fillEllipse(52, 38, 20, 14);
+      graphics.fillStyle(0x7d4737, 0.52);
+      graphics.fillEllipse(34, 26, 42, 20);
+      graphics.lineStyle(6, 0x2b1612, 0.24);
+      graphics.strokeEllipse(39, 30, 46, 22);
+      graphics.strokeLineShape(new Phaser.Geom.Line(14, 37, 62, 14));
+      graphics.strokeLineShape(new Phaser.Geom.Line(20, 46, 66, 26));
     });
 
     generate("fx-sparkle", 40, 40, () => {
@@ -1882,6 +2040,9 @@ export class GameScene extends Phaser.Scene {
     };
 
     fallback("fx-dirt", 24, 24, 0x7e5546);
+    fallback("fx-dirt-streak", 28, 20, 0x69352b);
+    fallback("fx-dirt-crumbs", 28, 24, 0x5b2f25);
+    fallback("fx-dirt-smudge", 28, 24, 0x4f2b24);
     fallback("fx-sparkle", 24, 24, 0xfff3a0);
     fallback("character-luiza", 32, 48, 0xff75a3);
     fallback("character-arek", 32, 48, 0x69a6ff);

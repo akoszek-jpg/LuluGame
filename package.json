@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "export:dirt": "node scripts/export-dirt-variants.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"
