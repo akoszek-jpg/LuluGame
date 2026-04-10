@@ -11,43 +11,53 @@
   <body>
     <div id="app">
       <div id="hud" class="panel">
-        <div class="hud-top">
-          <div>
-            <div class="eyebrow">Wynik</div>
-            <div id="scoreValue" class="stat-value">0</div>
+        <div class="hud-row">
+          <div class="hud-main">
+            <div class="ability-wrap ability-primary">
+              <button id="trashAbility" class="ability-button">Wynieś śmieci</button>
+              <div id="trashCooldown" class="ability-meta">Gotowe</div>
+            </div>
+            <div class="ability-wrap ability-primary">
+              <button id="fochAbility" class="ability-button">Foch</button>
+              <div id="fochCooldown" class="ability-meta">Gotowe</div>
+            </div>
+            <div id="messageValue" class="message-box message-primary">
+              Posprzątaj całe mieszkanie, zanim AREK znowu nabałagani.
+            </div>
           </div>
-          <div>
-            <div class="eyebrow">Czas</div>
-            <div id="timeValue" class="stat-value">30</div>
-          </div>
-          <div>
-            <div class="eyebrow">Poziom</div>
-            <div id="levelValue" class="stat-value">1 / 3</div>
-          </div>
-        </div>
-        <div class="hud-bottom">
-          <label class="avatar-switch panel-lite" for="avatarVariantToggle">
-            <span class="avatar-switch-copy">
-              <span class="eyebrow">Awatary</span>
-              <span id="avatarVariantLabel" class="avatar-switch-label">Wersja 2</span>
-            </span>
-            <span class="avatar-switch-control">
-              <input id="avatarVariantToggle" type="checkbox" />
-              <span class="avatar-switch-slider"></span>
-            </span>
-          </label>
-          <div class="ability-wrap">
-            <button id="trashAbility" class="ability-button">
-              Wynieś śmieci
-            </button>
-            <div id="trashCooldown" class="ability-meta">Gotowe</div>
-          </div>
-          <div class="ability-wrap">
-            <button id="fochAbility" class="ability-button">Foch</button>
-            <div id="fochCooldown" class="ability-meta">Gotowe</div>
-          </div>
-          <div id="messageValue" class="message-box">
-            Posprzątaj całe mieszkanie, zanim AREK znowu nabałagani.
+          <div class="hud-side">
+            <div class="hud-stat">
+              <div class="eyebrow">Wynik</div>
+              <div id="scoreValue" class="stat-value">0</div>
+            </div>
+            <div class="hud-stat">
+              <div class="eyebrow">Czas</div>
+              <div id="timeValue" class="stat-value">30</div>
+            </div>
+            <div class="hud-stat">
+              <div class="eyebrow">Poziom</div>
+              <div id="levelValue" class="stat-value">1 / 3</div>
+            </div>
+            <label class="avatar-switch panel-lite" for="avatarVariantToggle">
+              <span class="avatar-switch-copy">
+                <span class="eyebrow">Awatary</span>
+                <span id="avatarVariantLabel" class="avatar-switch-label">Wersja 2</span>
+              </span>
+              <span class="avatar-switch-control">
+                <input id="avatarVariantToggle" type="checkbox" checked />
+                <span class="avatar-switch-slider"></span>
+              </span>
+            </label>
+            <label class="avatar-switch panel-lite" for="musicToggle">
+              <span class="avatar-switch-copy">
+                <span class="eyebrow">Muzyka</span>
+                <span id="musicLabel" class="avatar-switch-label">Włączona</span>
+              </span>
+              <span class="avatar-switch-control">
+                <input id="musicToggle" type="checkbox" checked />
+                <span class="avatar-switch-slider"></span>
+              </span>
+            </label>
           </div>
         </div>
       </div>

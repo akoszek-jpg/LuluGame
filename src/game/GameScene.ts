@@ -185,6 +185,8 @@ export class GameScene extends Phaser.Scene {
   private musicTimer?: Phaser.Time.TimerEvent;
   private audioQueue: Promise<void> = Promise.resolve();
   private audioQueueToken = 0;
+  private cleaningOscillator?: OscillatorNode;
+  private cleaningGain?: GainNode;
 
   constructor(
     hudUpdater: (state: HudState) => void,
@@ -1050,8 +1052,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private getWebAudioContext(): AudioContext | undefined {
+    const soundManager = this.sound as Phaser.Sound.WebAudioSoundManager;
+    const context = soundManager.context;
+    return context instanceof AudioContext ? context : undefined;
+  }
+
   private async resumeAudioContext(): Promise<void> {
-    const context = this.sound.context;
+    const context = this.getWebAudioContext();
     if (!context || context.state !== "suspended") {
       return;
     }
@@ -1068,7 +1076,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const context = this.sound.context;
+    const context = this.getWebAudioContext();
     if (!context || context.state !== "running") {
       return;
     }
@@ -1266,7 +1274,7 @@ export class GameScene extends Phaser.Scene {
     play: (context: AudioContext, startAt: number) => void,
     durationMs: number
   ): Promise<void> {
-    const context = this.sound.context;
+    const context = this.getWebAudioContext();
     if (!context || context.state !== "running" || token !== this.audioQueueToken) {
       return Promise.resolve();
     }
@@ -1348,7 +1356,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startCleaningSound(): void {
-    const context = this.sound.context;
+    const context = this.getWebAudioContext();
     if (!context || this.cleaningOscillator) {
       return;
     }
@@ -1370,7 +1378,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private stopCleaningSound(): void {
-    const context = this.sound.context;
+    const context = this.getWebAudioContext();
     if (!context || !this.cleaningOscillator || !this.cleaningGain) {
       return;
     }
@@ -1532,7 +1540,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+    const graphics = this.make.graphics(undefined, false);
 
     const generate = (key: string, width: number, height: number, draw: () => void): void => {
       graphics.clear();
@@ -1855,7 +1863,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createFallbackTextures(): void {
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+    const graphics = this.make.graphics(undefined, false);
     const fallback = (key: string, width: number, height: number, color: number): void => {
       if (this.textures.exists(key)) {
         return;
