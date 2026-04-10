@@ -55,10 +55,10 @@ const TIMEOUT_QUOTES = [
     "Porządek gotowy, tylko patrzeć jak Arek znów coś napsoci!"
 ];
 const TIMEOUT_RESTART_QUOTES = [
-    "AREK rozsiadĹ‚ siÄ™ na kanapie i ogĹ‚asza: misja sprzÄ…tanie zakoĹ„czona spektakularnym baĹ‚aganem.",
-    "Luiza byĹ‚a blisko, ale AREK twierdzi, ĹĽe ten chaos to teraz nowy styl wnÄ™trzarski.",
-    "TykaĹ‚ zegar, a AREK juĹĽ szykowaĹ‚ zwyciÄ™ski taniec brudnych skarpetek.",
-    "AREK melduje, ĹĽe poziom obroniĹ‚ siÄ™ przed porzÄ…dkiem i zostaje z nami na bis."
+"AREK rozsiadł się na kanapie i ogłasza: misja sprzątanie zakończona spektakularnym bałaganem.",
+"Luiza była blisko, ale AREK twierdzi, że ten chaos to teraz nowy styl wnętrzarski.",
+"Tykał zegar, a AREK już szykował zwycięski taniec brudnych skarpetek.",
+"AREK melduje, że poziom obronił się przed porządkiem i zostaje z nami na bis."
 ];
 const MUSIC_NOTES = [659.25, 783.99, 880.0, 783.99, 987.77, 880.0, 783.99, 659.25];
 export class GameScene extends Phaser.Scene {
