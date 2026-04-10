@@ -28,14 +28,13 @@ const levelValue = document.querySelector<HTMLDivElement>("#levelValue");
 const messageValue = document.querySelector<HTMLDivElement>("#messageValue");
 const trashButton = document.querySelector<HTMLButtonElement>("#trashAbility");
 const fochButton = document.querySelector<HTMLButtonElement>("#fochAbility");
-const trashCooldown = document.querySelector<HTMLDivElement>("#trashCooldown");
-const fochCooldown = document.querySelector<HTMLDivElement>("#fochCooldown");
 const touchControls = document.querySelector<HTMLDivElement>("#touchControls");
 const touchButtons = document.querySelectorAll<HTMLButtonElement>(".touch-button");
 const startOverlay = document.querySelector<HTMLDivElement>("#startOverlay");
 const startAvatar = document.querySelector<HTMLImageElement>("#startAvatar");
 const startButton = document.querySelector<HTMLButtonElement>("#startButton");
 const eventOverlay = document.querySelector<HTMLDivElement>("#eventOverlay");
+const pauseOverlay = document.querySelector<HTMLDivElement>("#pauseOverlay");
 const eventAvatar = document.querySelector<HTMLImageElement>("#eventAvatar");
 const eventEyebrow = document.querySelector<HTMLDivElement>("#eventEyebrow");
 const eventTitle = document.querySelector<HTMLHeadingElement>("#eventTitle");
@@ -59,13 +58,12 @@ if (
   !messageValue ||
   !trashButton ||
   !fochButton ||
-  !trashCooldown ||
-  !fochCooldown ||
   !touchControls ||
   !startOverlay ||
   !startAvatar ||
   !startButton ||
   !eventOverlay ||
+  !pauseOverlay ||
   !eventAvatar ||
   !eventEyebrow ||
   !eventTitle ||
@@ -85,6 +83,7 @@ let sceneRef: GameScene | null = null;
 const assetBase = `${import.meta.env.BASE_URL}assets/`;
 startAvatar.src = `${assetBase}luiza.png`;
 startAvatar.alt = "Luiza";
+const ABILITY_COOLDOWN_SECONDS = 15;
 
 const repairMojibake = (value: string): string => {
   let repaired = value;
@@ -116,12 +115,35 @@ const updateHud = (state: HudState): void => {
 
   trashButton.disabled = !state.trashOutReady;
   fochButton.disabled = !state.fochReady;
-  trashCooldown.textContent =
-    state.trashOutCooldown > 0
-      ? `Gotowe za ${Math.ceil(state.trashOutCooldown)} s`
-      : "Gotowe";
-  fochCooldown.textContent =
-    state.fochCooldown > 0 ? `Gotowe za ${Math.ceil(state.fochCooldown)} s` : "Gotowe";
+  updateAbilityButton(
+    trashButton,
+    state.trashOutCooldown,
+    state.trashOutReady,
+    "Wynieś śmieci"
+  );
+  updateAbilityButton(fochButton, state.fochCooldown, state.fochReady, "Foch");
+};
+
+const updateAbilityButton = (
+  button: HTMLButtonElement,
+  cooldown: number,
+  ready: boolean,
+  title: string
+): void => {
+  const titleNode = button.querySelector<HTMLElement>(".ability-title");
+  const statusNode = button.querySelector<HTMLElement>(".ability-status");
+  if (!titleNode || !statusNode) {
+    return;
+  }
+
+  titleNode.textContent = title;
+  statusNode.textContent = ready ? "Gotowe" : `${Math.ceil(cooldown)} s`;
+
+  const progress = ready
+    ? 1
+    : Math.max(0, Math.min(1, 1 - cooldown / ABILITY_COOLDOWN_SECONDS));
+  button.style.setProperty("--cooldown-progress", `${progress}`);
+  button.dataset.ready = ready ? "true" : "false";
 };
 
 const updateOverlay = (state: OverlayState): void => {
@@ -163,12 +185,18 @@ const activateAbility = (name: AbilityName): void => {
 const startGame = (): void => {
   startOverlay.classList.add("hidden");
   eventOverlay.classList.add("hidden");
+  pauseOverlay.classList.add("hidden");
   sceneRef?.startGame();
 };
 
 const continueOverlay = (): void => {
   eventOverlay.classList.add("hidden");
+  pauseOverlay.classList.add("hidden");
   sceneRef?.continueAfterOverlay();
+};
+
+const updatePauseOverlay = (paused: boolean): void => {
+  pauseOverlay.classList.toggle("hidden", !paused);
 };
 
 const updateAvatarVariantUi = (): void => {
@@ -247,6 +275,12 @@ window.addEventListener("blur", () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (event.code === "Space") {
+    event.preventDefault();
+    updatePauseOverlay(sceneRef?.togglePause() ?? false);
+    return;
+  }
+
   if (event.code === "Digit1") {
     activateAbility("trashOut");
   }

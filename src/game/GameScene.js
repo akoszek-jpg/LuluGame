@@ -1,15 +1,18 @@
 import Phaser from "phaser";
 import { LEVELS } from "./levelData";
-const LEVEL_TIME = 60;
-const CLEAN_DURATION = 1000;
-const AREK_DIRTY_DURATION = 2250;
-const PLAYER_SPEED = 250;
+const BASE_LEVEL_TIME = 74;
+const MIN_LEVEL_TIME = 54;
+const CLEAN_DURATION = 930;
+const AREK_DIRTY_DURATION = 2550;
+const PLAYER_SPEED = 268;
 const TOTAL_DIFFICULTY_LEVELS = 10;
-const DIFFICULTY_SPEED_STEP = 0.1;
-const CLEAN_RANGE = 74;
+const DIFFICULTY_SPEED_STEP = 0.045;
+const CLEAN_RANGE = 82;
 const POINTER_REACHED_THRESHOLD = 10;
-const ABILITY_COOLDOWN = 30;
-const ABILITY_DURATION = 5;
+const TRASH_OUT_MOVE_SPEED_MULTIPLIER = 2.4;
+const ABILITY_COOLDOWN = 15;
+const FOCH_DURATION = 3;
+const TRASH_OUT_HIDE_DURATION = 2.5;
 const BONUS_ALL_CLEAN = 100;
 const CLEAN_VOICE_LINES = ["Czysto!", "Super!"];
 const CLEAN_VOICE_CONFIG = {
@@ -107,7 +110,7 @@ export class GameScene extends Phaser.Scene {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: LEVEL_TIME
+            value: BASE_LEVEL_TIME
         });
         Object.defineProperty(this, "message", {
             enumerable: true,
@@ -181,6 +184,12 @@ export class GameScene extends Phaser.Scene {
             writable: true,
             value: new Phaser.Math.Vector2()
         });
+        Object.defineProperty(this, "arekTargetFurniture", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: void 0
+        });
         Object.defineProperty(this, "cleaningFurniture", {
             enumerable: true,
             configurable: true,
@@ -220,6 +229,18 @@ export class GameScene extends Phaser.Scene {
                 foch: 0
             }
         });
+        Object.defineProperty(this, "trashOutPhase", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "trashOutHiddenRemaining", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        });
         Object.defineProperty(this, "arekHidden", {
             enumerable: true,
             configurable: true,
@@ -251,6 +272,12 @@ export class GameScene extends Phaser.Scene {
             value: false
         });
         Object.defineProperty(this, "gameStarted", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "paused", {
             enumerable: true,
             configurable: true,
             writable: true,
@@ -362,7 +389,7 @@ export class GameScene extends Phaser.Scene {
         if (this.gameEnded) {
             return;
         }
-        if (!this.gameStarted || this.overlayVisible) {
+        if (!this.gameStarted || this.overlayVisible || this.paused) {
             this.updateCharacterViews();
             this.syncHud();
             return;
@@ -390,6 +417,7 @@ export class GameScene extends Phaser.Scene {
     useAbility(name) {
         if (!this.gameStarted ||
             this.gameEnded ||
+            this.paused ||
             this.nextLevelTimer > 0 ||
             this.activeAbility !== null) {
             return;
@@ -397,9 +425,14 @@ export class GameScene extends Phaser.Scene {
         if (this.abilityCooldowns[name] > 0) {
             return;
         }
-        this.activeAbility = { name, remaining: ABILITY_DURATION };
+        this.activeAbility = {
+            name,
+            remaining: name === "foch" ? FOCH_DURATION : 0
+        };
         this.abilityCooldowns[name] = ABILITY_COOLDOWN;
         if (name === "trashOut") {
+            this.trashOutPhase = "toDoor";
+            this.trashOutHiddenRemaining = 0;
             this.message = "Wynieś śmieci! AREK maszeruje do drzwi.";
             this.arekTarget.set(this.currentLevel.door.x, this.currentLevel.door.y);
         }
@@ -412,7 +445,7 @@ export class GameScene extends Phaser.Scene {
     loadLevel(index, resetScore) {
         this.levelIndex = index;
         this.currentLevel = LEVELS[index % LEVELS.length];
-        this.timeLeft = LEVEL_TIME;
+        this.timeLeft = this.getLevelTime();
         this.message =
             index === 0 && !this.gameStarted
                 ? "Kliknij, aby Luiza ruszyła do sprzątania."
@@ -428,8 +461,11 @@ export class GameScene extends Phaser.Scene {
         this.activeAbility = null;
         this.abilityCooldowns.trashOut = 0;
         this.abilityCooldowns.foch = 0;
+        this.trashOutPhase = null;
+        this.trashOutHiddenRemaining = 0;
         this.arekHidden = false;
         this.gameEnded = false;
+        this.paused = false;
         this.overlayVisible = false;
         this.pendingLevelIndex = null;
         this.pendingRestart = false;
@@ -440,6 +476,7 @@ export class GameScene extends Phaser.Scene {
         this.playerPosition.set(this.currentLevel.playerSpawn.x, this.currentLevel.playerSpawn.y);
         this.arekPosition.set(this.currentLevel.arekSpawn.x, this.currentLevel.arekSpawn.y);
         this.arekTarget.set(this.arekPosition.x, this.arekPosition.y);
+        this.arekTargetFurniture = undefined;
         this.playerTarget = undefined;
         this.roomLayer?.destroy();
         this.roomTexts.forEach((text) => text.destroy());
@@ -511,6 +548,19 @@ export class GameScene extends Phaser.Scene {
             this.hideOverlay();
             this.loadLevel(nextLevel, false);
         }
+    }
+    togglePause() {
+        if (!this.gameStarted || this.gameEnded || this.overlayVisible) {
+            return this.paused;
+        }
+        this.paused = !this.paused;
+        if (this.paused) {
+            this.clearDirectionalInput();
+            this.stopCleaningSound();
+            this.clearAudioQueue();
+        }
+        this.syncHud();
+        return this.paused;
     }
     drawLevel() {
         const graphics = this.add.graphics();
@@ -655,6 +705,7 @@ export class GameScene extends Phaser.Scene {
         if (this.controlMode !== "mouse" ||
             !this.gameStarted ||
             this.gameEnded ||
+            this.paused ||
             this.overlayVisible ||
             this.nextLevelTimer > 0) {
             return;
@@ -686,16 +737,23 @@ export class GameScene extends Phaser.Scene {
             return;
         }
         if (this.activeAbility?.name === "trashOut") {
+            this.arekTargetFurniture = undefined;
+            if (this.trashOutPhase === "hidden") {
+                this.updateCharacterViews();
+                return;
+            }
             if (!this.arekHidden) {
                 const distanceToDoor = Phaser.Math.Distance.Between(this.arekPosition.x, this.arekPosition.y, this.currentLevel.door.x, this.currentLevel.door.y);
                 if (distanceToDoor < 18) {
                     this.arekHidden = true;
+                    this.trashOutPhase = "hidden";
+                    this.trashOutHiddenRemaining = TRASH_OUT_HIDE_DURATION;
                     this.setArekVisibility(false);
                     this.message = "AREK wyniósł śmieci i na chwilę zniknął.";
                     this.updateCharacterViews();
                     return;
                 }
-                this.moveArekTowards(this.currentLevel.door.x, this.currentLevel.door.y, delta);
+                this.moveArekTowards(this.currentLevel.door.x, this.currentLevel.door.y, delta, this.getArekMoveSpeed() * TRASH_OUT_MOVE_SPEED_MULTIPLIER);
             }
             this.updateCharacterViews();
             return;
@@ -703,19 +761,21 @@ export class GameScene extends Phaser.Scene {
         if (this.arekHidden) {
             this.arekHidden = false;
             this.arekPosition.set(this.currentLevel.door.x, this.currentLevel.door.y);
+            this.arekTargetFurniture = undefined;
             this.setArekVisibility(true);
             this.message = "AREK wrócił i znów szuka czystych rzeczy.";
         }
         const cleanFurniture = this.furnitureStates.filter((item) => item.state === "clean");
         if (cleanFurniture.length > 0) {
-            const nearest = this.chooseArekTarget(cleanFurniture);
-            this.arekTarget.set(nearest.data.x, nearest.data.y);
+            const target = this.resolveArekTarget(cleanFurniture);
+            this.arekTarget.set(target.data.x, target.data.y);
             this.moveArekTowards(this.arekTarget.x, this.arekTarget.y, delta);
-            if (Phaser.Math.Distance.Between(this.arekPosition.x, this.arekPosition.y, nearest.data.x, nearest.data.y) < 36) {
-                this.startArekDirtying(nearest);
+            if (Phaser.Math.Distance.Between(this.arekPosition.x, this.arekPosition.y, target.data.x, target.data.y) < 36) {
+                this.startArekDirtying(target);
             }
         }
         else {
+            this.arekTargetFurniture = undefined;
             if (Phaser.Math.Distance.Between(this.arekPosition.x, this.arekPosition.y, this.arekTarget.x, this.arekTarget.y) < 20) {
                 const randomRoom = Phaser.Utils.Array.GetRandom(this.currentLevel.rooms);
                 this.arekTarget.set(Phaser.Math.Between(randomRoom.x + 60, randomRoom.x + randomRoom.width - 60), Phaser.Math.Between(randomRoom.y + 60, randomRoom.y + randomRoom.height - 60));
@@ -724,13 +784,13 @@ export class GameScene extends Phaser.Scene {
         }
         this.updateCharacterViews();
     }
-    moveArekTowards(x, y, delta) {
+    moveArekTowards(x, y, delta, speedOverride) {
         const direction = new Phaser.Math.Vector2(x - this.arekPosition.x, y - this.arekPosition.y);
         if (direction.lengthSq() <= 1) {
             return;
         }
         direction.normalize();
-        const speed = this.getArekMoveSpeed();
+        const speed = speedOverride ?? this.getArekMoveSpeed();
         this.arekPosition.x += direction.x * speed * delta;
         this.arekPosition.y += direction.y * speed * delta;
         this.clampPosition(this.arekPosition, 30);
@@ -808,7 +868,20 @@ export class GameScene extends Phaser.Scene {
     finishArekDirtying(target) {
         this.arekDirtyFurniture = undefined;
         this.arekDirtyRemaining = 0;
+        if (this.arekTargetFurniture === target) {
+            this.arekTargetFurniture = undefined;
+        }
         this.makeFurnitureDirty(target);
+    }
+    resolveArekTarget(cleanFurniture) {
+        if (this.arekTargetFurniture &&
+            this.arekTargetFurniture.state === "clean" &&
+            cleanFurniture.includes(this.arekTargetFurniture)) {
+            return this.arekTargetFurniture;
+        }
+        const nextTarget = this.chooseArekTarget(cleanFurniture);
+        this.arekTargetFurniture = nextTarget;
+        return nextTarget;
     }
     chooseArekTarget(cleanFurniture) {
         const byArek = [...cleanFurniture].sort((a, b) => {
@@ -824,26 +897,29 @@ export class GameScene extends Phaser.Scene {
             const distanceB = Phaser.Math.Distance.Between(this.playerPosition.x, this.playerPosition.y, b.data.x, b.data.y);
             return distanceA - distanceB;
         });
-        if (this.levelIndex === 1) {
-            return Math.random() < 0.45 ? byLuiza[0] : byArek[0];
-        }
-        return Math.random() < 0.7 ? byLuiza[0] : byArek[0];
+        const luizaPressureChance = Math.min(0.72, 0.08 + this.levelIndex * 0.1);
+        return Math.random() < luizaPressureChance ? byLuiza[0] : byArek[0];
     }
     getArekMoveSpeed() {
         const cleanCount = this.furnitureStates.filter((item) => item.state === "clean").length;
-        const levelBonus = this.getDifficultySpeedMultiplier();
-        const pressureBonus = cleanCount >= 4 ? 1.08 : 1;
+        const lateGameBonus = this.levelIndex >= 3 ? (this.levelIndex - 2) * 0.08 : 0;
+        const levelBonus = 0.94 + this.levelIndex * 0.055 + lateGameBonus;
+        const pressureBonus = cleanCount >= 5 ? 1.05 : cleanCount >= 9 ? 1.1 : 1;
         return this.currentLevel.arekSpeed * levelBonus * pressureBonus;
     }
     getPlayerMoveSpeed() {
-        return PLAYER_SPEED * this.getDifficultySpeedMultiplier();
+        return PLAYER_SPEED * (1 + this.levelIndex * 0.015);
     }
     getDifficultySpeedMultiplier() {
         return 1 + this.levelIndex * DIFFICULTY_SPEED_STEP;
     }
     getArekDirtyDuration() {
-        const multiplier = Math.max(0.35, 1 - this.levelIndex * 0.1);
+        const lateGameReduction = this.levelIndex >= 3 ? (this.levelIndex - 2) * 0.045 : 0;
+        const multiplier = Math.max(0.4, 1.06 - this.levelIndex * 0.05 - lateGameReduction);
         return AREK_DIRTY_DURATION * multiplier;
+    }
+    getLevelTime() {
+        return Math.max(MIN_LEVEL_TIME, BASE_LEVEL_TIME - this.levelIndex * 3);
     }
     updateCharacterViews() {
         if (this.playerView) {
@@ -896,16 +972,30 @@ export class GameScene extends Phaser.Scene {
         if (!this.activeAbility) {
             return;
         }
+        if (this.activeAbility.name === "trashOut") {
+            if (this.trashOutPhase === "hidden") {
+                this.trashOutHiddenRemaining -= delta;
+                if (this.trashOutHiddenRemaining <= 0) {
+                    this.arekHidden = false;
+                    this.trashOutPhase = null;
+                    this.activeAbility = null;
+                    this.arekPosition.set(this.currentLevel.door.x, this.currentLevel.door.y);
+                    this.arekTarget.set(this.arekPosition.x, this.arekPosition.y);
+                    this.arekTargetFurniture = undefined;
+                    this.setArekVisibility(true);
+                    this.message = "AREK wrócił po wyniesieniu śmieci i znów rozgląda się za bałaganem.";
+                }
+            }
+            return;
+        }
         this.activeAbility.remaining -= delta;
         if (this.activeAbility.remaining <= 0) {
-            const endedAbility = this.activeAbility.name;
             this.activeAbility = null;
-            if (endedAbility === "trashOut") {
-                this.message = "AREK wraca po wyniesieniu śmieci.";
-            }
-            else {
-                this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
-            }
+            this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
+            return;
+            this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
+            this.message = "AREK wraca po wyniesieniu śmieci.";
+            this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
         }
     }
     checkFullClean() {

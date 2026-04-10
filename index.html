@@ -13,13 +13,25 @@
       <div id="hud" class="panel">
         <div class="hud-row">
           <div class="hud-main">
-            <div class="ability-wrap ability-primary">
-              <button id="trashAbility" class="ability-button">Wynieś śmieci</button>
-              <div id="trashCooldown" class="ability-meta">Gotowe</div>
-            </div>
-            <div class="ability-wrap ability-primary">
-              <button id="fochAbility" class="ability-button">Foch</button>
-              <div id="fochCooldown" class="ability-meta">Gotowe</div>
+            <div class="abilities-group">
+              <div class="ability-wrap ability-primary">
+                <button id="trashAbility" class="ability-button">
+                  <span class="ability-fill"></span>
+                  <span class="ability-content">
+                    <span class="ability-title">Wynieś śmieci</span>
+                    <span class="ability-status">Gotowe</span>
+                  </span>
+                </button>
+              </div>
+              <div class="ability-wrap ability-primary">
+                <button id="fochAbility" class="ability-button">
+                  <span class="ability-fill"></span>
+                  <span class="ability-content">
+                    <span class="ability-title">Foch</span>
+                    <span class="ability-status">Gotowe</span>
+                  </span>
+                </button>
+              </div>
             </div>
             <div id="messageValue" class="message-box message-primary">
               Posprzątaj całe mieszkanie, zanim AREK znowu nabałagani.
@@ -83,10 +95,10 @@
               alt="Luiza"
             />
             <div class="start-copy">
-              <div class="start-eyebrow">LUIZA MELDUJE GOTOWOSC</div>
-              <h1 class="start-title">Czas posprzatac!</h1>
+              <div class="start-eyebrow">LUIZA MELDUJE GOTOWOŚĆ</div>
+              <h1 class="start-title">Czas posprzątać!</h1>
               <p class="start-quote">
-                "Arek znow nabalagani! Ruszajmy, zanim zrobi z mieszkania totalny chaos!"
+                "Arek znów nabałagani! Ruszajmy, zanim zrobi z mieszkania totalny chaos!"
               </p>
               <button id="startButton" class="start-button">Kliknij i zacznij</button>
             </div>
@@ -102,11 +114,20 @@
             />
             <div class="start-copy">
               <div id="eventEyebrow" class="start-eyebrow">KONIEC POZIOMU</div>
-              <h2 id="eventTitle" class="start-title">Poziom zakonczony!</h2>
+              <h2 id="eventTitle" class="start-title">Poziom zakończony!</h2>
               <p id="eventQuote" class="start-quote">
-                Luiza lapie oddech, a mieszkanie szykuje kolejna niespodzianke.
+                Luiza łapie oddech, a mieszkanie szykuje kolejną niespodziankę.
               </p>
               <button id="eventButton" class="start-button">Dalej</button>
+            </div>
+          </div>
+        </div>
+        <div id="pauseOverlay" class="start-overlay hidden">
+          <div class="pause-card panel">
+            <div class="start-copy pause-copy">
+              <div class="start-eyebrow">GRA WSTRZYMANA</div>
+              <h2 class="start-title">Pauza</h2>
+              <p class="start-quote">Naciśnij spację jeszcze raz, aby wrócić do sprzątania.</p>
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ export const LEVELS = [
         playerSpawn: { x: 170, y: 150 },
         arekSpawn: { x: 1090, y: 625 },
         door: { x: 1150, y: 645 },
-        arekSpeed: 92,
+        arekSpeed: 78,
         rooms: [
             { id: "hall", name: "Przedpokój", x: 30, y: 30, width: 250, height: 220, color: 0xffde8a },
             { id: "kitchen", name: "Kuchnia", x: 300, y: 30, width: 330, height: 270, color: 0xffc58c },
@@ -52,7 +52,7 @@ export const LEVELS = [
         playerSpawn: { x: 150, y: 635 },
         arekSpawn: { x: 1230, y: 110 },
         door: { x: 84, y: 676 },
-        arekSpeed: 138,
+        arekSpeed: 102,
         rooms: [
             { id: "hall", name: "Przedpokój", x: 30, y: 540, width: 255, height: 190, color: 0xffdd92 },
             { id: "kitchen", name: "Kuchnia", x: 30, y: 30, width: 360, height: 230, color: 0xffc796 },
@@ -88,7 +88,7 @@ export const LEVELS = [
         playerSpawn: { x: 180, y: 112 },
         arekSpawn: { x: 1310, y: 718 },
         door: { x: 1385, y: 728 },
-        arekSpeed: 164,
+        arekSpeed: 122,
         rooms: [
             { id: "hall", name: "Przedpokój", x: 30, y: 30, width: 270, height: 230, color: 0xffdd95 },
             { id: "kitchen", name: "Kuchnia", x: 320, y: 30, width: 360, height: 250, color: 0xffc38f },

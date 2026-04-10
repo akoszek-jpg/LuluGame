@@ -13,14 +13,13 @@ const levelValue = document.querySelector("#levelValue");
 const messageValue = document.querySelector("#messageValue");
 const trashButton = document.querySelector("#trashAbility");
 const fochButton = document.querySelector("#fochAbility");
-const trashCooldown = document.querySelector("#trashCooldown");
-const fochCooldown = document.querySelector("#fochCooldown");
 const touchControls = document.querySelector("#touchControls");
 const touchButtons = document.querySelectorAll(".touch-button");
 const startOverlay = document.querySelector("#startOverlay");
 const startAvatar = document.querySelector("#startAvatar");
 const startButton = document.querySelector("#startButton");
 const eventOverlay = document.querySelector("#eventOverlay");
+const pauseOverlay = document.querySelector("#pauseOverlay");
 const eventAvatar = document.querySelector("#eventAvatar");
 const eventEyebrow = document.querySelector("#eventEyebrow");
 const eventTitle = document.querySelector("#eventTitle");
@@ -38,13 +37,12 @@ if (!scoreValue ||
     !messageValue ||
     !trashButton ||
     !fochButton ||
-    !trashCooldown ||
-    !fochCooldown ||
     !touchControls ||
     !startOverlay ||
     !startAvatar ||
     !startButton ||
     !eventOverlay ||
+    !pauseOverlay ||
     !eventAvatar ||
     !eventEyebrow ||
     !eventTitle ||
@@ -62,6 +60,7 @@ let sceneRef = null;
 const assetBase = `${import.meta.env.BASE_URL}assets/`;
 startAvatar.src = `${assetBase}luiza.png`;
 startAvatar.alt = "Luiza";
+const ABILITY_COOLDOWN_SECONDS = 15;
 const repairMojibake = (value) => {
     let repaired = value;
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -88,12 +87,22 @@ const updateHud = (state) => {
     messageValue.textContent = repairMojibake(state.message);
     trashButton.disabled = !state.trashOutReady;
     fochButton.disabled = !state.fochReady;
-    trashCooldown.textContent =
-        state.trashOutCooldown > 0
-            ? `Gotowe za ${Math.ceil(state.trashOutCooldown)} s`
-            : "Gotowe";
-    fochCooldown.textContent =
-        state.fochCooldown > 0 ? `Gotowe za ${Math.ceil(state.fochCooldown)} s` : "Gotowe";
+    updateAbilityButton(trashButton, state.trashOutCooldown, state.trashOutReady, "Wynieś śmieci");
+    updateAbilityButton(fochButton, state.fochCooldown, state.fochReady, "Foch");
+};
+const updateAbilityButton = (button, cooldown, ready, title) => {
+    const titleNode = button.querySelector(".ability-title");
+    const statusNode = button.querySelector(".ability-status");
+    if (!titleNode || !statusNode) {
+        return;
+    }
+    titleNode.textContent = title;
+    statusNode.textContent = ready ? "Gotowe" : `${Math.ceil(cooldown)} s`;
+    const progress = ready
+        ? 1
+        : Math.max(0, Math.min(1, 1 - cooldown / ABILITY_COOLDOWN_SECONDS));
+    button.style.setProperty("--cooldown-progress", `${progress}`);
+    button.dataset.ready = ready ? "true" : "false";
 };
 const updateOverlay = (state) => {
     if (!state.visible) {
@@ -129,11 +138,16 @@ const activateAbility = (name) => {
 const startGame = () => {
     startOverlay.classList.add("hidden");
     eventOverlay.classList.add("hidden");
+    pauseOverlay.classList.add("hidden");
     sceneRef?.startGame();
 };
 const continueOverlay = () => {
     eventOverlay.classList.add("hidden");
+    pauseOverlay.classList.add("hidden");
     sceneRef?.continueAfterOverlay();
+};
+const updatePauseOverlay = (paused) => {
+    pauseOverlay.classList.toggle("hidden", !paused);
 };
 const updateAvatarVariantUi = () => {
     avatarVariantLabel.textContent = avatarVariantToggle.checked ? "Wersja 2" : "Wersja 1";
@@ -200,6 +214,11 @@ window.addEventListener("blur", () => {
     resetDirectionalInput();
 });
 window.addEventListener("keydown", (event) => {
+    if (event.code === "Space") {
+        event.preventDefault();
+        updatePauseOverlay(sceneRef?.togglePause() ?? false);
+        return;
+    }
     if (event.code === "Digit1") {
         activateAbility("trashOut");
     }

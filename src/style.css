@@ -75,6 +75,12 @@ body {
   overflow: hidden;
 }
 
+.abilities-group {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+
 .hud-side {
   flex: 0 1 auto;
   display: flex;
@@ -105,18 +111,14 @@ body {
 
 .ability-wrap {
   width: auto;
-  flex: 0 0 356px;
+  flex: 0 0 182px;
   min-width: 0;
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 6px;
-  height: 38px;
+  height: 44px;
 }
 
 .ability-primary {
-  flex-basis: 356px;
+  flex-basis: 182px;
 }
 
 .avatar-switch {
@@ -190,19 +192,21 @@ body {
 
 
 .ability-button {
+  --cooldown-progress: 1;
   appearance: none;
+  position: relative;
   border: none;
   border-radius: 10px;
-  padding: 5px 9px;
+  padding: 0;
   font: inherit;
-  font-size: 0.82rem;
-  font-weight: 800;
-  background: linear-gradient(180deg, #ffdb76, #ff9a61);
+  background: linear-gradient(180deg, #ffd96f, #ff9a61);
   color: #562b18;
   cursor: pointer;
   transition: transform 120ms ease, filter 120ms ease;
-  min-height: 38px;
+  min-height: 44px;
   flex: 1 1 auto;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .ability-button:hover,
@@ -216,41 +220,64 @@ body {
 
 .ability-button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.9;
 }
 
-.ability-meta {
-  margin-top: 0;
-  font-size: 0.72rem;
-  color: #7a4b37;
-  width: 92px;
-  min-width: 92px;
+.ability-fill {
+  position: absolute;
+  inset: 0;
+  width: calc(var(--cooldown-progress) * 100%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), rgba(255, 245, 187, 0.46));
+  z-index: -1;
+  transition: width 180ms linear;
+}
+
+.ability-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   text-align: center;
-  line-height: 1.15;
-  font-weight: 700;
+  gap: 2px;
+  padding: 4px 10px;
+}
+
+.ability-title {
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ability-status {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #7a4b37;
+  line-height: 1;
 }
 
 .message-box {
-  flex: 1 1 auto;
+  flex: 1 1 420px;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  justify-content: flex-start;
+  text-align: left;
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.18;
-  height: 38px;
+  height: 44px;
   overflow: hidden;
 }
 
 .message-primary {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.12;
   padding-inline: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 #game-shell {
@@ -356,6 +383,23 @@ body {
   width: min(860px, 100%);
 }
 
+.pause-card {
+  width: min(560px, 92%);
+  padding: 28px 32px;
+  text-align: center;
+}
+
+.pause-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pause-copy .start-quote {
+  max-width: 28ch;
+  margin-bottom: 0;
+}
+
 .touch-controls {
   position: absolute;
   left: 18px;
@@ -419,6 +463,14 @@ body {
   .hud-side {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .abilities-group {
+    width: 100%;
+  }
+
+  .ability-wrap {
+    flex: 1 1 0;
   }
 
   .hud-side {
