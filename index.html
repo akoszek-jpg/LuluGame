@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>LUIZA kontra AREK</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="hud" class="panel">
+        <div class="hud-top">
+          <div>
+            <div class="eyebrow">Wynik</div>
+            <div id="scoreValue" class="stat-value">0</div>
+          </div>
+          <div>
+            <div class="eyebrow">Czas</div>
+            <div id="timeValue" class="stat-value">30</div>
+          </div>
+          <div>
+            <div class="eyebrow">Poziom</div>
+            <div id="levelValue" class="stat-value">1 / 3</div>
+          </div>
+        </div>
+        <div class="hud-bottom">
+          <label class="avatar-switch panel-lite" for="avatarVariantToggle">
+            <span class="avatar-switch-copy">
+              <span class="eyebrow">Awatary</span>
+              <span id="avatarVariantLabel" class="avatar-switch-label">Wersja 2</span>
+            </span>
+            <span class="avatar-switch-control">
+              <input id="avatarVariantToggle" type="checkbox" />
+              <span class="avatar-switch-slider"></span>
+            </span>
+          </label>
+          <div class="ability-wrap">
+            <button id="trashAbility" class="ability-button">
+              Wynieś śmieci
+            </button>
+            <div id="trashCooldown" class="ability-meta">Gotowe</div>
+          </div>
+          <div class="ability-wrap">
+            <button id="fochAbility" class="ability-button">Foch</button>
+            <div id="fochCooldown" class="ability-meta">Gotowe</div>
+          </div>
+          <div id="messageValue" class="message-box">
+            Posprzątaj całe mieszkanie, zanim AREK znowu nabałagani.
+          </div>
+        </div>
+      </div>
+
+      <div id="game-shell">
+        <div id="game"></div>
+        <div id="startOverlay" class="start-overlay">
+          <div class="start-card panel">
+            <img
+              id="startAvatar"
+              class="start-avatar"
+              src="/assets/luiza.png"
+              alt="Luiza"
+            />
+            <div class="start-copy">
+              <div class="start-eyebrow">LUIZA MELDUJE GOTOWOSC</div>
+              <h1 class="start-title">Czas posprzatac!</h1>
+              <p class="start-quote">
+                "Arek znow nabalagani! Ruszajmy, zanim zrobi z mieszkania totalny chaos!"
+              </p>
+              <button id="startButton" class="start-button">Kliknij i zacznij</button>
+            </div>
+          </div>
+        </div>
+        <div id="eventOverlay" class="start-overlay hidden">
+          <div class="start-card panel event-card">
+            <img
+              id="eventAvatar"
+              class="start-avatar"
+              src="/assets/luiza.png"
+              alt="Luiza"
+            />
+            <div class="start-copy">
+              <div id="eventEyebrow" class="start-eyebrow">KONIEC POZIOMU</div>
+              <h2 id="eventTitle" class="start-title">Poziom zakonczony!</h2>
+              <p id="eventQuote" class="start-quote">
+                Luiza lapie oddech, a mieszkanie szykuje kolejna niespodzianke.
+              </p>
+              <button id="eventButton" class="start-button">Dalej</button>
+            </div>
+          </div>
+        </div>
+        <div id="touchControls" class="touch-controls" aria-label="Sterowanie dotykowe">
+          <button data-dir="up" class="touch-button up">▲</button>
+          <button data-dir="left" class="touch-button left">◀</button>
+          <button data-dir="down" class="touch-button down">▼</button>
+          <button data-dir="right" class="touch-button right">▶</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
