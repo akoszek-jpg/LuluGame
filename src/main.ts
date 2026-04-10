@@ -26,6 +26,7 @@ const trashCooldown = document.querySelector<HTMLDivElement>("#trashCooldown");
 const fochCooldown = document.querySelector<HTMLDivElement>("#fochCooldown");
 const touchButtons = document.querySelectorAll<HTMLButtonElement>(".touch-button");
 const startOverlay = document.querySelector<HTMLDivElement>("#startOverlay");
+const startAvatar = document.querySelector<HTMLImageElement>("#startAvatar");
 const startButton = document.querySelector<HTMLButtonElement>("#startButton");
 const eventOverlay = document.querySelector<HTMLDivElement>("#eventOverlay");
 const eventAvatar = document.querySelector<HTMLImageElement>("#eventAvatar");
@@ -50,6 +51,7 @@ if (
   !trashCooldown ||
   !fochCooldown ||
   !startOverlay ||
+  !startAvatar ||
   !startButton ||
   !eventOverlay ||
   !eventAvatar ||
@@ -66,6 +68,9 @@ if (
 }
 
 let sceneRef: GameScene | null = null;
+const assetBase = `${import.meta.env.BASE_URL}assets/`;
+startAvatar.src = `${assetBase}luiza.png`;
+startAvatar.alt = "Luiza";
 
 const updateHud = (state: HudState): void => {
   scoreValue.textContent = `${state.score}`;
@@ -94,7 +99,8 @@ const updateOverlay = (state: OverlayState): void => {
   eventTitle.textContent = state.title;
   eventQuote.textContent = state.quote;
   eventButton.textContent = state.buttonLabel;
-  eventAvatar.src = state.avatar === "arek" ? "/assets/arek.jpg" : "/assets/luiza.png";
+  eventAvatar.src =
+    state.avatar === "arek" ? `${assetBase}arek.jpg` : `${assetBase}luiza.png`;
   eventAvatar.alt = state.avatar === "arek" ? "Arek" : "Luiza";
 };
 

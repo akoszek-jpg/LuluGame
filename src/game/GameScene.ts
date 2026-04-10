@@ -200,8 +200,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image("character-luiza-photo", "/assets/luiza.png");
-    this.load.image("character-arek-photo", "/assets/arek.jpg");
+    this.load.image(
+      "character-luiza-photo",
+      `${import.meta.env.BASE_URL}assets/luiza.png`
+    );
+    this.load.image(
+      "character-arek-photo",
+      `${import.meta.env.BASE_URL}assets/arek.jpg`
+    );
   }
 
   create(): void {
