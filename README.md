@@ -32,3 +32,6 @@ npm run dev
 - zamienić placeholderowe kształty na rysowane sprite'y
 - dopracować menu startowe, ekran końca gry i restart poziomu
 - wzbogacić audio oraz efekty wizualne sprzątania
+
+
+ODPALAMY
