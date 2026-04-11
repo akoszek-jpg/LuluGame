@@ -1,5 +1,14 @@
 import Phaser from "phaser";
 import { LEVELS, LevelData, FurnitureData, RoomData } from "./levelData";
+import {
+  CHARACTER_DISPLAY_TEXT,
+  GAMEPLAY_QUOTE_TEXT,
+  GAMEPLAY_TEXT,
+  OVERLAY_TEXT,
+  SYSTEM_LOG_TEXT,
+  VOICE_AUDIO_CONFIG,
+  VOICE_LINE_TEXT
+} from "./gameTexts";
 
 export type AbilityName = "trashOut" | "foch";
 export type ControlMode = "classic" | "mouse";
@@ -60,6 +69,8 @@ type FurnitureState = {
   data: FurnitureData;
   spriteKey: FurnitureSpriteKey;
   state: "dirty" | "clean";
+  dirtTint: number;
+  dirtAuraColor: number;
   shadow: Phaser.GameObjects.Ellipse;
   aura: Phaser.GameObjects.Ellipse;
   image: Phaser.GameObjects.Image;
@@ -90,6 +101,11 @@ type DirtStyle = {
   scale: number;
   angle: number;
 };
+
+const DIRT_AURA_COLOR = 0x52606b;
+const DIRT_AURA_ALPHA = 0.14;
+const DIRT_TEXTURE_ALPHA = 0.78;
+const DEFAULT_ROOM_COLOR = 0xf7eee2;
 
 const BASE_LEVEL_TIME = 74;
 const MIN_LEVEL_TIME = 54;
@@ -154,6 +170,12 @@ const TIMEOUT_RESTART_QUOTES = [
 "Tykał zegar, a AREK już szykował zwycięski taniec brudnych skarpetek.",
 "AREK melduje, że poziom obronił się przed porządkiem i zostaje z nami na bis."
 ];
+const TIMEOUT_RESTART_QUOTES_ALT = [
+  "AREK rozsiadĹ‚ siÄ™ na kanapie i ogĹ‚asza: misja sprzÄ…tanie zakoĹ„czona spektakularnym baĹ‚aganem.",
+  "Luiza byĹ‚a blisko, ale AREK twierdzi, ĹĽe ten chaos to teraz nowy styl wnÄ™trzarski.",
+  "Zegar siÄ™ zatrzymaĹ‚, a AREK tylko wzrusza ramionami, jakby ten baĹ‚agan byĹ‚ od poczÄ…tku czÄ™Ĺ›ciÄ… planu.",
+  "Luiza byĹ‚a o krok od sukcesu, ale AREK juĹĽ patrzy dumnie na chaos, ktĂłry wĹ‚aĹ›nie ogĹ‚osiĹ‚ swoim dzieĹ‚em."
+];
 const MUSIC_NOTES = [659.25, 783.99, 880.0, 783.99, 987.77, 880.0, 783.99, 659.25];
 
 export class GameScene extends Phaser.Scene {
@@ -166,7 +188,7 @@ export class GameScene extends Phaser.Scene {
   private currentLevel!: LevelData;
   private score = 0;
   private timeLeft = BASE_LEVEL_TIME;
-  private message = "Sprzątaj szybciej, niż AREK bałagani.";
+  private message: string = GAMEPLAY_TEXT.defaultMessage;
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<string, Phaser.Input.Keyboard.Key>;
@@ -249,7 +271,7 @@ export class GameScene extends Phaser.Scene {
     try {
       this.createProceduralTextures();
     } catch (error) {
-      console.error("Nie udało się wygenerować głównych assetów, włączam fallback.", error);
+      console.error(SYSTEM_LOG_TEXT.textureFallbackError, error);
       this.createFallbackTextures();
     }
     this.loadLevel(0, true);
@@ -322,10 +344,10 @@ export class GameScene extends Phaser.Scene {
     if (name === "trashOut") {
       this.trashOutPhase = "toDoor";
       this.trashOutHiddenRemaining = 0;
-      this.message = "Wynieś śmieci! AREK maszeruje do drzwi.";
+      this.message = GAMEPLAY_TEXT.abilityMessages.trashOut;
       this.arekTarget.set(this.currentLevel.door.x, this.currentLevel.door.y);
     } else {
-      this.message = "Foch! AREK stoi i obraża się przez chwilę.";
+      this.message = GAMEPLAY_TEXT.abilityMessages.foch;
     }
 
     this.playSpecialAbilityVoice(name);
@@ -338,10 +360,10 @@ export class GameScene extends Phaser.Scene {
     this.timeLeft = this.getLevelTime();
     this.message =
       index === 0 && !this.gameStarted
-        ? "Kliknij, aby Luiza ruszyła do sprzątania."
+        ? GAMEPLAY_TEXT.levelIntroPrompt
         : index === 0
-          ? "Start! LUIZA wkracza do akcji."
-          : `Poziom ${index + 1}. Mieszkanie robi się coraz większe.`;
+          ? GAMEPLAY_TEXT.levelStart
+          : GAMEPLAY_TEXT.levelLoaded.replace("{level}", `${index + 1}`);
     this.fullCleanPending = false;
     this.lastAllCleanState = false;
     this.cleaningFurniture = undefined;
@@ -408,7 +430,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.gameStarted = true;
-    this.message = "Start! LUIZA wkracza do akcji.";
+    this.message = GAMEPLAY_TEXT.levelStart;
     void this.resumeAudioContext();
     this.syncHud();
   }
@@ -444,7 +466,7 @@ export class GameScene extends Phaser.Scene {
       this.hideOverlay();
       this.loadLevel(0, true);
       this.gameStarted = true;
-      this.message = "Nowa runda! Luiza wraca do akcji.";
+      this.message = GAMEPLAY_TEXT.nextRoundStart;
       this.syncHud();
       return;
     }
@@ -517,6 +539,7 @@ export class GameScene extends Phaser.Scene {
     this.currentLevel.furniture.forEach((item, index) => {
       const spriteKey = this.resolveFurnitureSprite(item.id);
       const dirtStyle = this.resolveDirtStyle(item.id, index);
+      const dirtyPalette = this.resolveDirtyPalette(item);
       const shadow = this.add.ellipse(
         item.x,
         item.y + item.height * 0.22,
@@ -530,12 +553,12 @@ export class GameScene extends Phaser.Scene {
         item.y + item.height * 0.06,
         item.width * 0.94,
         Math.max(24, item.height * 0.58),
-        0xc56a4a,
-        0.18
+        dirtyPalette.auraColor,
+        DIRT_AURA_ALPHA
       );
       const image = this.add.image(item.x, item.y, `furniture-${spriteKey}`);
       image.setDisplaySize(item.width, item.height);
-      image.setTint(0xa97767);
+      image.setTint(item.dirtyTint);
 
       const dirt = this.add.image(
         item.x + item.width * dirtStyle.offsetX,
@@ -546,7 +569,8 @@ export class GameScene extends Phaser.Scene {
         Math.max(0.36, Math.min(item.width, item.height) / 124) * dirtStyle.scale
       );
       dirt.setAngle(dirtStyle.angle);
-      dirt.setAlpha(0.98);
+      dirt.setTint(dirtyPalette.dirtTint);
+      dirt.setAlpha(DIRT_TEXTURE_ALPHA);
 
       const sparkle = this.add.image(
         item.x + item.width * 0.28,
@@ -568,6 +592,8 @@ export class GameScene extends Phaser.Scene {
         data: item,
         spriteKey,
         state: "dirty",
+        dirtTint: dirtyPalette.dirtTint,
+        dirtAuraColor: dirtyPalette.auraColor,
         shadow,
         aura,
         image,
@@ -577,8 +603,16 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    this.playerView = this.createCharacter("luiza", "LUIZA", "#5d2e46");
-    this.arekView = this.createCharacter("arek", "AREK", "#27497f");
+    this.playerView = this.createCharacter(
+      "luiza",
+      CHARACTER_DISPLAY_TEXT.luizaName,
+      "#5d2e46"
+    );
+    this.arekView = this.createCharacter(
+      "arek",
+      CHARACTER_DISPLAY_TEXT.arekName,
+      "#27497f"
+    );
     this.fitCameraToLevel();
     this.updateCharacterViews();
   }
@@ -756,7 +790,7 @@ export class GameScene extends Phaser.Scene {
           this.trashOutPhase = "hidden";
           this.trashOutHiddenRemaining = TRASH_OUT_HIDE_DURATION;
           this.setArekVisibility(false);
-          this.message = "AREK wyniósł śmieci i na chwilę zniknął.";
+          this.message = GAMEPLAY_TEXT.trashOutHidden;
           this.updateCharacterViews();
           return;
         }
@@ -778,7 +812,7 @@ export class GameScene extends Phaser.Scene {
       this.arekPosition.set(this.currentLevel.door.x, this.currentLevel.door.y);
       this.arekTargetFurniture = undefined;
       this.setArekVisibility(true);
-      this.message = "AREK wrócił i znów szuka czystych rzeczy.";
+      this.message = GAMEPLAY_TEXT.trashOutReturn;
     }
 
     const cleanFurniture = this.furnitureStates.filter((item) => item.state === "clean");
@@ -864,7 +898,10 @@ export class GameScene extends Phaser.Scene {
   private startCleaning(target: FurnitureState): void {
     this.cleaningFurniture = target;
     this.cleaningRemaining = CLEAN_DURATION;
-    this.message = `LUIZA ogarnia: ${target.data.label}.`;
+    this.message = GAMEPLAY_TEXT.cleaningInProgress.replace(
+      "{label}",
+      target.data.label
+    );
   }
 
   private finishCleaning(target: FurnitureState): void {
@@ -889,7 +926,7 @@ export class GameScene extends Phaser.Scene {
       yoyo: true
     });
     this.score += 10;
-    this.message = Phaser.Utils.Array.GetRandom(CLEAN_STATUS_LINES).replace(
+    this.message = Phaser.Utils.Array.GetRandom(GAMEPLAY_QUOTE_TEXT.cleanStatusLines).replace(
       "{label}",
       target.data.label
     );
@@ -902,9 +939,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     target.state = "dirty";
-    target.image.setTint(0xb78c7a);
-    target.aura.setFillStyle(0xc56a4a, 0.2);
-    target.dirt.setAlpha(0.95);
+    target.image.setTint(target.data.dirtyTint);
+    target.aura.setFillStyle(target.dirtAuraColor, DIRT_AURA_ALPHA);
+    target.dirt.setTint(target.dirtTint);
+    target.dirt.setAlpha(DIRT_TEXTURE_ALPHA);
     target.sparkle.setAlpha(0);
     this.tweens.add({
       targets: [target.image, target.dirt],
@@ -914,7 +952,7 @@ export class GameScene extends Phaser.Scene {
       repeat: 1
     });
     this.score = Math.max(0, this.score - 5);
-    this.message = Phaser.Utils.Array.GetRandom(AREK_MESS_LINES).replace(
+    this.message = Phaser.Utils.Array.GetRandom(GAMEPLAY_QUOTE_TEXT.arekMessLines).replace(
       "{label}",
       target.data.label
     );
@@ -928,7 +966,10 @@ export class GameScene extends Phaser.Scene {
 
     this.arekDirtyFurniture = target;
     this.arekDirtyRemaining = this.getArekDirtyDuration();
-    this.message = `AREK bałagani przy: ${target.data.label}.`;
+    this.message = GAMEPLAY_TEXT.arekDirtyingInProgress.replace(
+      "{label}",
+      target.data.label
+    );
   }
 
   private finishArekDirtying(target: FurnitureState): void {
@@ -1101,7 +1142,7 @@ export class GameScene extends Phaser.Scene {
           this.arekTarget.set(this.arekPosition.x, this.arekPosition.y);
           this.arekTargetFurniture = undefined;
           this.setArekVisibility(true);
-          this.message = "AREK wrócił po wyniesieniu śmieci i znów rozgląda się za bałaganem.";
+          this.message = GAMEPLAY_TEXT.trashOutReturnAfterAbility;
         }
       }
       return;
@@ -1110,11 +1151,11 @@ export class GameScene extends Phaser.Scene {
     this.activeAbility.remaining -= delta;
     if (this.activeAbility.remaining <= 0) {
       this.activeAbility = null;
-      this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
+      this.message = GAMEPLAY_TEXT.fochFinished;
       return;
-      this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
-        this.message = "AREK wraca po wyniesieniu śmieci.";
-        this.message = "Foch minął. AREK znów chodzi po mieszkaniu.";
+      this.message = GAMEPLAY_TEXT.fochFinished;
+        this.message = GAMEPLAY_TEXT.trashOutReturn;
+        this.message = GAMEPLAY_TEXT.fochFinished;
     }
   }
 
@@ -1123,7 +1164,10 @@ export class GameScene extends Phaser.Scene {
 
     if (allClean && !this.lastAllCleanState) {
       this.score += BONUS_ALL_CLEAN;
-      this.message = `Pełny porządek! Bonus +${BONUS_ALL_CLEAN}.`;
+      this.message = GAMEPLAY_TEXT.fullCleanBonus.replace(
+        "{bonus}",
+        `${BONUS_ALL_CLEAN}`
+      );
       this.fullCleanPending = true;
       this.showLevelCompleteOverlay();
     }
@@ -1155,11 +1199,19 @@ export class GameScene extends Phaser.Scene {
 
     this.overlayUpdater({
       visible: true,
-      eyebrow: "POZIOM UKOŃCZONY",
-      title: `Poziom ${this.levelIndex + 1} ogarnięty!`,
-      quote: Phaser.Utils.Array.GetRandom(LEVEL_COMPLETE_QUOTES),
+      eyebrow: OVERLAY_TEXT.levelComplete.eyebrow,
+      title: OVERLAY_TEXT.levelComplete.title.replace(
+        "{level}",
+        `${this.levelIndex + 1}`
+      ),
+      quote: Phaser.Utils.Array.GetRandom(OVERLAY_TEXT.levelComplete.quoteOptions),
       buttonLabel:
-        this.pendingLevelIndex === null ? "Zobacz wynik" : `Wejdź na poziom ${this.levelIndex + 2}`,
+        this.pendingLevelIndex === null
+          ? OVERLAY_TEXT.levelComplete.finalScoreButton
+          : OVERLAY_TEXT.levelComplete.nextLevelButton.replace(
+              "{level}",
+              `${this.levelIndex + 2}`
+            ),
       avatar: "luiza"
     });
   }
@@ -1168,18 +1220,22 @@ export class GameScene extends Phaser.Scene {
     this.gameEnded = true;
     this.clearAudioQueue();
     this.message = victory
-      ? `Brawo! LUIZA ogarnęła wszystkie poziomy z wynikiem ${this.score}.`
-      : `Czas minął. Końcowy wynik LUIZY: ${this.score}.`;
+      ? GAMEPLAY_TEXT.victoryScore.replace("{score}", `${this.score}`)
+      : GAMEPLAY_TEXT.defeatScore.replace("{score}", `${this.score}`);
     this.pendingRestart = true;
     this.overlayVisible = true;
     this.overlayUpdater({
       visible: true,
-      eyebrow: victory ? "WIELKI FINAŁ" : "KONIEC GRY",
-      title: victory ? "Luiza wygrywa!" : "Czas minął!",
+      eyebrow: victory
+        ? OVERLAY_TEXT.finishGame.victoryEyebrow
+        : OVERLAY_TEXT.finishGame.defeatEyebrow,
+      title: victory
+        ? OVERLAY_TEXT.finishGame.victoryTitle
+        : OVERLAY_TEXT.finishGame.defeatTitle,
       quote: victory
-        ? `Końcowy wynik: ${this.score}. Nawet Arek przyznaje, że to mieszkanie lśni.`
-        : `Końcowy wynik: ${this.score}. Luiza bierze oddech i zaraz rusza od nowa.`,
-      buttonLabel: "Zagraj od nowa",
+        ? OVERLAY_TEXT.finishGame.victoryQuote.replace("{score}", `${this.score}`)
+        : OVERLAY_TEXT.finishGame.defeatQuote.replace("{score}", `${this.score}`),
+      buttonLabel: OVERLAY_TEXT.finishGame.restartButton,
       avatar: victory ? "luiza" : "arek"
     });
     this.syncHud();
@@ -1191,15 +1247,21 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.message = `Koniec czasu. Przechodzisz do poziomu ${this.levelIndex + 2}.`;
+    this.message = GAMEPLAY_TEXT.levelTimeoutAdvance.replace(
+      "{level}",
+      `${this.levelIndex + 2}`
+    );
     this.pendingLevelIndex = this.levelIndex + 1;
     this.overlayVisible = true;
     this.overlayUpdater({
       visible: true,
-      eyebrow: "KONIEC CZASU",
-      title: `Poziom ${this.levelIndex + 1} zamknięty`,
-      quote: Phaser.Utils.Array.GetRandom(TIMEOUT_QUOTES),
-      buttonLabel: "Do kolejnego poziomu",
+      eyebrow: OVERLAY_TEXT.timeoutAdvance.eyebrow,
+      title: OVERLAY_TEXT.timeoutAdvance.title.replace(
+        "{level}",
+        `${this.levelIndex + 1}`
+      ),
+      quote: Phaser.Utils.Array.GetRandom(OVERLAY_TEXT.timeoutAdvance.quoteOptions),
+      buttonLabel: OVERLAY_TEXT.timeoutAdvance.button,
       avatar: "luiza"
     });
   }
@@ -1210,13 +1272,16 @@ export class GameScene extends Phaser.Scene {
     this.pendingRestart = true;
     this.pendingLevelIndex = null;
     this.overlayVisible = true;
-    this.message = `AREK wygrał rundę bałaganu. Wracacie na poziom 1 z wynikiem ${this.score}.`;
+    this.message = GAMEPLAY_TEXT.levelFailureRestart.replace(
+      "{score}",
+      `${this.score}`
+    );
     this.overlayUpdater({
       visible: true,
-      eyebrow: "AREK MA UBaw",
-      title: "Oops, bałagan wygrywa!",
-      quote: Phaser.Utils.Array.GetRandom(TIMEOUT_RESTART_QUOTES),
-      buttonLabel: "Wróć na poziom 1",
+      eyebrow: OVERLAY_TEXT.timeoutRestart.eyebrow,
+      title: OVERLAY_TEXT.timeoutRestart.title,
+      quote: Phaser.Utils.Array.GetRandom(OVERLAY_TEXT.timeoutRestart.quoteOptions),
+      buttonLabel: OVERLAY_TEXT.timeoutRestart.button,
       avatar: "arek"
     });
     this.syncHud();
@@ -1250,10 +1315,10 @@ export class GameScene extends Phaser.Scene {
     this.overlayVisible = false;
     this.overlayUpdater({
       visible: false,
-      eyebrow: "",
-      title: "",
-      quote: "",
-      buttonLabel: "",
+      eyebrow: OVERLAY_TEXT.hidden.eyebrow,
+      title: OVERLAY_TEXT.hidden.title,
+      quote: OVERLAY_TEXT.hidden.quote,
+      buttonLabel: OVERLAY_TEXT.hidden.buttonLabel,
       avatar: "luiza"
     });
   }
@@ -1273,7 +1338,7 @@ export class GameScene extends Phaser.Scene {
     try {
       await context.resume();
     } catch (error) {
-      console.warn("Nie udało się wznowić kontekstu audio.", error);
+      console.warn(SYSTEM_LOG_TEXT.resumeAudioWarning, error);
     }
   }
 
@@ -1616,9 +1681,9 @@ export class GameScene extends Phaser.Scene {
 
     this.enqueueAudioAction((token) =>
       this.speakQueuedLine(
-        Phaser.Utils.Array.GetRandom(CLEAN_VOICE_LINES),
+        Phaser.Utils.Array.GetRandom(VOICE_LINE_TEXT.clean),
         "female",
-        CLEAN_VOICE_CONFIG,
+        VOICE_AUDIO_CONFIG.clean,
         token
       )
     );
@@ -1632,9 +1697,9 @@ export class GameScene extends Phaser.Scene {
     this.enqueueAudioAction((token) => this.playPingQueued(token));
     this.enqueueAudioAction((token) =>
       this.speakQueuedLine(
-        SPECIAL_VOICE_LINES[name],
+        VOICE_LINE_TEXT.specialAbility[name],
         "female",
-        SPECIAL_VOICE_CONFIG[name],
+        VOICE_AUDIO_CONFIG.specialAbility[name],
         token
       )
     );
@@ -1648,9 +1713,9 @@ export class GameScene extends Phaser.Scene {
 
     this.enqueueAudioAction((token) =>
       this.speakQueuedLine(
-        Phaser.Utils.Array.GetRandom(AREK_VOICE_LINES),
+        Phaser.Utils.Array.GetRandom(VOICE_LINE_TEXT.arek),
         "male",
-        AREK_VOICE_CONFIG,
+        VOICE_AUDIO_CONFIG.arek,
         token
       )
     );
@@ -1753,6 +1818,91 @@ export class GameScene extends Phaser.Scene {
     return variants[hash % variants.length];
   }
 
+  private resolveDirtyPalette(item: FurnitureData): {
+    dirtTint: number;
+    auraColor: number;
+  } {
+    const roomColor = this.resolveRoomColor(item.roomId);
+    const furnitureLuminance = this.getColorLuminance(item.dirtyTint);
+    const roomLuminance = this.getColorLuminance(roomColor);
+    const contrastBase = this.createContrastColor(item.dirtyTint);
+    const dirtShouldBeDark = furnitureLuminance > 0.56 || roomLuminance > 0.7;
+    const anchorColor = dirtShouldBeDark ? 0x21303a : 0xdce9f5;
+    const auraAnchor = dirtShouldBeDark ? DIRT_AURA_COLOR : 0xafc3d4;
+    const dirtTint = this.ensureColorContrast(
+      this.mixColors(contrastBase, anchorColor, 0.4),
+      item.dirtyTint,
+      roomColor,
+      dirtShouldBeDark ? 0.3 : 0.26
+    );
+    const auraColor = this.ensureColorContrast(
+      this.mixColors(dirtTint, auraAnchor, 0.45),
+      item.dirtyTint,
+      roomColor,
+      0.18
+    );
+
+    return { dirtTint, auraColor };
+  }
+
+  private resolveRoomColor(roomId: string): number {
+    return this.currentLevel.rooms.find((room) => room.id === roomId)?.color ?? DEFAULT_ROOM_COLOR;
+  }
+
+  private createContrastColor(color: number): number {
+    const { r, g, b } = Phaser.Display.Color.IntegerToRGB(color);
+    return Phaser.Display.Color.GetColor(
+      Phaser.Math.Clamp(Math.round(b * 0.72 + 28), 0, 255),
+      Phaser.Math.Clamp(Math.round(g * 0.52 + 36), 0, 255),
+      Phaser.Math.Clamp(Math.round(r * 0.42 + 64), 0, 255)
+    );
+  }
+
+  private ensureColorContrast(
+    color: number,
+    furnitureColor: number,
+    roomColor: number,
+    minimumDifference: number
+  ): number {
+    const furnitureLuminance = this.getColorLuminance(furnitureColor);
+    const roomLuminance = this.getColorLuminance(roomColor);
+    const currentLuminance = this.getColorLuminance(color);
+    const shouldDarken = furnitureLuminance >= roomLuminance;
+    let adjusted = color;
+
+    if (Math.abs(currentLuminance - furnitureLuminance) < minimumDifference) {
+      adjusted = shouldDarken
+        ? this.mixColors(color, 0x101820, 0.45)
+        : this.mixColors(color, 0xf4f8fc, 0.4);
+    }
+
+    const againstRoom = this.getColorLuminance(adjusted);
+    if (Math.abs(againstRoom - roomLuminance) < minimumDifference * 0.75) {
+      adjusted = shouldDarken
+        ? this.mixColors(adjusted, 0x0a1016, 0.28)
+        : this.mixColors(adjusted, 0xffffff, 0.24);
+    }
+
+    return adjusted;
+  }
+
+  private mixColors(first: number, second: number, amount: number): number {
+    const weight = Phaser.Math.Clamp(amount, 0, 1);
+    const firstRgb = Phaser.Display.Color.IntegerToRGB(first);
+    const secondRgb = Phaser.Display.Color.IntegerToRGB(second);
+
+    return Phaser.Display.Color.GetColor(
+      Math.round(firstRgb.r + (secondRgb.r - firstRgb.r) * weight),
+      Math.round(firstRgb.g + (secondRgb.g - firstRgb.g) * weight),
+      Math.round(firstRgb.b + (secondRgb.b - firstRgb.b) * weight)
+    );
+  }
+
+  private getColorLuminance(color: number): number {
+    const { r, g, b } = Phaser.Display.Color.IntegerToRGB(color);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  }
+
   private createProceduralTextures(): void {
     if (this.textures.exists("character-luiza")) {
       return;
@@ -1767,44 +1917,59 @@ export class GameScene extends Phaser.Scene {
     };
 
     generate("fx-dirt", 48, 48, () => {
-      graphics.fillStyle(0x7e5546, 0.95);
+      graphics.fillStyle(0xa4adb5, 0.62);
+      graphics.fillCircle(24, 26, 14);
+      graphics.fillStyle(0x363c42, 0.92);
       graphics.fillCircle(16, 16, 8);
       graphics.fillCircle(24, 26, 11);
       graphics.fillCircle(34, 18, 7);
       graphics.fillCircle(18, 32, 7);
+      graphics.lineStyle(2, 0xf1f5f8, 0.34);
+      graphics.strokeCircle(24, 26, 13);
     });
 
     generate("fx-dirt-streak", 72, 56, () => {
-      graphics.fillStyle(0x69352b, 0.94);
+      graphics.fillStyle(0xaab2b8, 0.46);
+      graphics.fillRoundedRect(10, 14, 48, 12, 7);
+      graphics.fillRoundedRect(18, 26, 40, 11, 6);
+      graphics.fillStyle(0x343b42, 0.9);
       graphics.fillRoundedRect(8, 12, 50, 10, 6);
       graphics.fillRoundedRect(16, 24, 42, 9, 5);
       graphics.fillRoundedRect(24, 35, 32, 8, 4);
       graphics.fillCircle(58, 15, 6);
       graphics.fillCircle(18, 39, 5);
-      graphics.lineStyle(5, 0x311612, 0.26);
+      graphics.lineStyle(4, 0xf1f5f8, 0.26);
+      graphics.strokeLineShape(new Phaser.Geom.Line(14, 16, 48, 12));
+      graphics.lineStyle(5, 0x171c21, 0.22);
       graphics.strokeLineShape(new Phaser.Geom.Line(12, 18, 62, 6));
       graphics.strokeLineShape(new Phaser.Geom.Line(22, 31, 67, 20));
     });
 
     generate("fx-dirt-crumbs", 70, 62, () => {
-      graphics.fillStyle(0x5b2f25, 0.98);
+      graphics.fillStyle(0xadb4ba, 0.42);
+      graphics.fillCircle(34, 33, 14);
+      graphics.fillStyle(0x353b42, 0.94);
       const crumbs = [
         [12, 18, 5], [24, 14, 4], [38, 20, 6], [50, 16, 5], [18, 32, 4], [30, 30, 5],
         [45, 34, 4], [58, 29, 6], [14, 46, 5], [28, 48, 4], [42, 46, 5], [55, 44, 4]
       ];
       crumbs.forEach(([x, y, r]) => graphics.fillCircle(x, y, r));
-      graphics.fillStyle(0x3e2019, 0.5);
-      graphics.fillCircle(34, 33, 12);
+      graphics.lineStyle(2, 0xf3f6f8, 0.28);
+      graphics.strokeCircle(34, 33, 12);
     });
 
     generate("fx-dirt-smudge", 74, 62, () => {
-      graphics.fillStyle(0x4f2b24, 0.96);
+      graphics.fillStyle(0xb0b6bc, 0.44);
+      graphics.fillEllipse(34, 29, 48, 24);
+      graphics.fillStyle(0x333a41, 0.92);
       graphics.fillEllipse(26, 28, 30, 18);
       graphics.fillEllipse(45, 23, 26, 16);
       graphics.fillEllipse(52, 38, 20, 14);
-      graphics.fillStyle(0x7d4737, 0.52);
+      graphics.fillStyle(0xc4ccd1, 0.24);
       graphics.fillEllipse(34, 26, 42, 20);
-      graphics.lineStyle(6, 0x2b1612, 0.24);
+      graphics.lineStyle(3, 0xf3f6f8, 0.24);
+      graphics.strokeEllipse(34, 29, 48, 22);
+      graphics.lineStyle(6, 0x12161a, 0.18);
       graphics.strokeEllipse(39, 30, 46, 22);
       graphics.strokeLineShape(new Phaser.Geom.Line(14, 37, 62, 14));
       graphics.strokeLineShape(new Phaser.Geom.Line(20, 46, 66, 26));
@@ -2129,10 +2294,10 @@ export class GameScene extends Phaser.Scene {
       graphics.generateTexture(key, width, height);
     };
 
-    fallback("fx-dirt", 24, 24, 0x7e5546);
-    fallback("fx-dirt-streak", 28, 20, 0x69352b);
-    fallback("fx-dirt-crumbs", 28, 24, 0x5b2f25);
-    fallback("fx-dirt-smudge", 28, 24, 0x4f2b24);
+    fallback("fx-dirt", 24, 24, 0x363c42);
+    fallback("fx-dirt-streak", 28, 20, 0x343b42);
+    fallback("fx-dirt-crumbs", 28, 24, 0x353b42);
+    fallback("fx-dirt-smudge", 28, 24, 0x333a41);
     fallback("fx-sparkle", 24, 24, 0xfff3a0);
     fallback("character-luiza", 32, 48, 0xff75a3);
     fallback("character-arek", 32, 48, 0x69a6ff);

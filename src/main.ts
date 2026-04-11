@@ -7,6 +7,11 @@ import {
   OverlayState,
   ControlMode
 } from "./game/GameScene";
+import {
+  CHARACTER_DISPLAY_TEXT,
+  SYSTEM_LOG_TEXT,
+  UI_TEXT
+} from "./game/gameTexts";
 
 type InputState = {
   up: boolean;
@@ -76,13 +81,13 @@ if (
   !musicToggle ||
   !musicLabel
 ) {
-  throw new Error("Nie znaleziono wymaganych elementów UI.");
+  throw new Error(UI_TEXT.requiredElementsError);
 }
 
 let sceneRef: GameScene | null = null;
 const assetBase = `${import.meta.env.BASE_URL}assets/`;
 startAvatar.src = `${assetBase}luiza.png`;
-startAvatar.alt = "Luiza";
+startAvatar.alt = CHARACTER_DISPLAY_TEXT.luizaAlt;
 const ABILITY_COOLDOWN_SECONDS = 15;
 
 const repairMojibake = (value: string): string => {
@@ -119,9 +124,14 @@ const updateHud = (state: HudState): void => {
     trashButton,
     state.trashOutCooldown,
     state.trashOutReady,
-    "Wynieś śmieci"
+    UI_TEXT.abilityTitles.trashOut
   );
-  updateAbilityButton(fochButton, state.fochCooldown, state.fochReady, "Foch");
+  updateAbilityButton(
+    fochButton,
+    state.fochCooldown,
+    state.fochReady,
+    UI_TEXT.abilityTitles.foch
+  );
 };
 
 const updateAbilityButton = (
@@ -137,7 +147,9 @@ const updateAbilityButton = (
   }
 
   titleNode.textContent = title;
-  statusNode.textContent = ready ? "Gotowe" : `${Math.ceil(cooldown)} s`;
+  statusNode.textContent = ready
+    ? UI_TEXT.abilityReady
+    : `${Math.ceil(cooldown)} s`;
 
   const progress = ready
     ? 1
@@ -159,7 +171,10 @@ const updateOverlay = (state: OverlayState): void => {
   eventButton.textContent = repairMojibake(state.buttonLabel);
   eventAvatar.src =
     state.avatar === "arek" ? `${assetBase}arek.jpg` : `${assetBase}luiza.png`;
-  eventAvatar.alt = state.avatar === "arek" ? "Arek" : "Luiza";
+  eventAvatar.alt =
+    state.avatar === "arek"
+      ? CHARACTER_DISPLAY_TEXT.arekAlt
+      : CHARACTER_DISPLAY_TEXT.luizaAlt;
 };
 
 const scene = new GameScene(updateHud, updateOverlay, inputState);
@@ -200,12 +215,16 @@ const updatePauseOverlay = (paused: boolean): void => {
 };
 
 const updateAvatarVariantUi = (): void => {
-  avatarVariantLabel.textContent = avatarVariantToggle.checked ? "Wersja 2" : "Wersja 1";
+  avatarVariantLabel.textContent = avatarVariantToggle.checked
+    ? UI_TEXT.avatarVariantLabels.second
+    : UI_TEXT.avatarVariantLabels.first;
   sceneRef?.setAvatarVariant(avatarVariantToggle.checked ? 2 : 1);
 };
 
 const updateMusicUi = (): void => {
-  musicLabel.textContent = musicToggle.checked ? "Włączona" : "Wyłączona";
+  musicLabel.textContent = musicToggle.checked
+    ? UI_TEXT.musicLabels.enabled
+    : UI_TEXT.musicLabels.disabled;
   sceneRef?.setAudioEnabled(musicToggle.checked);
 };
 
@@ -218,7 +237,10 @@ const resetDirectionalInput = (): void => {
 
 const updateControlModeUi = (): void => {
   const mode: ControlMode = controlModeToggle.checked ? "mouse" : "classic";
-  controlModeLabel.textContent = mode === "mouse" ? "Myszka" : "Klasyczne";
+  controlModeLabel.textContent =
+    mode === "mouse"
+      ? UI_TEXT.controlModeLabels.mouse
+      : UI_TEXT.controlModeLabels.classic;
   touchControls.classList.toggle("hidden", mode === "mouse");
   resetDirectionalInput();
   sceneRef?.setControlMode(mode);
@@ -291,7 +313,7 @@ window.addEventListener("keydown", (event) => {
 
 const logAvailableVoices = (): void => {
   if (!("speechSynthesis" in window)) {
-    console.warn("Speech Synthesis API nie jest dostępne w tej przeglądarce.");
+    console.warn(SYSTEM_LOG_TEXT.speechSynthesisUnavailable);
     return;
   }
 
@@ -301,7 +323,7 @@ const logAvailableVoices = (): void => {
     default: voice.default
   }));
 
-  console.log("Dostępne głosy syntezatora mowy:");
+  console.log(SYSTEM_LOG_TEXT.speechVoicesHeader);
   console.table(voices);
 };
 
